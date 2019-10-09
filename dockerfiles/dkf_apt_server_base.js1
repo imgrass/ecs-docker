@@ -1,0 +1,23 @@
+# Usage: used for APT server
+FROM ubuntu:16.04.3
+
+MAINTAINER imgrass
+
+COPY ./src_add/vim.tiny /usr/bin
+COPY ./src_add/update_local_apt_repo.sh /usr/bin
+COPY ./src_add/init_apt_server.sh /root
+# for ease of use, it can be changed according to the actual situation.
+COPY ./src_add/sources.list /etc/apt
+
+RUN     /bin/ln -s /usr/bin/vim.tiny /usr/bin/vim && ln -s /usr/bin/vim.tiny /usr/bin/vi && \
+        /bin/chmod +x /usr/bin/update_local_apt_repo.sh && \
+        /usr/bin/apt-get --allow-unauthenticated update -y && \
+        /usr/bin/apt-get --allow-unauthenticated install -y iputils-ping && \
+        /usr/bin/apt-get --allow-unauthenticated install -y iproute2 && \
+        /usr/bin/apt-get --allow-unauthenticated install -y dpkg-dev && \
+        /usr/bin/apt-get --allow-unauthenticated install -y apache2 && \
+        /usr/bin/apt-get clean && \
+        /bin/mkdir -p /var/www/html/debs/openstack
+
+# cmd must be executed
+ENTRYPOINT  ["bash", "/root/init_apt_server.sh", "-i"]

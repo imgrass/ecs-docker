@@ -1,0 +1,14 @@
+# Usage: used for APT server of openstack queen
+FROM apt_server:base_0
+
+MAINTAINER imgrass
+
+COPY ./src_add/requested_debs_list.txt /root
+
+RUN     /bin/bash /root/init_apt_server.sh -i && \
+        export openstack_repo_dir="/var/www/html/debs" && \
+        export openstack_repo="openstack" && \
+        /bin/bash /root/init_apt_server.sh -u /root/requested_debs_list.txt
+
+# cmd must be executed
+ENTRYPOINT  ["bash", "/root/init_apt_server.sh", "-i"]
