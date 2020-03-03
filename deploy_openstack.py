@@ -14,6 +14,33 @@ class DeployOpenstackBase(object):
 
     dk_client = docker.from_env()
 
+    def create_network(self, **kwargs):
+        name    = kwargs['name']
+        subnet  = kwargs['subnet']
+        gateway = kwargs['gateway']
+
+        driver  = kwargs.get('driver', 'bridge')
+
+        print('+ Create network %s with <subnet:%s> <gateway:%s>' %
+              (name, subnet, gateway))
+        try:
+            network = self.dk_client.networks.get(name)
+            ipam_config = network.attrs.get('IPAM').get('Config')
+            for ipam in ipam_config:
+                if ipam.get('Subnet') == subnet and \
+                   ipam.get('Gateway') == gateway:
+                    print('  Network already existed')
+                    return
+            network.remove()
+            print('  ==> remove existed network %s' % name)
+        except docker.errors.NotFound:
+            pass
+
+        ipam_pool = docker.types.IPAMPool(subnet=subnet, gateway=gateway)
+        ipam_config = docker.types.IPAMConfig(pool_configs=[ipam_pool])
+        return self.dk_client.networks.create(name, driver=driver,
+                                              ipam=ipam_config)
+
     def create_container(self, **kwargs):
         hostname = kwargs['hostname']
         image    = kwargs['image']
@@ -24,6 +51,8 @@ class DeployOpenstackBase(object):
         env      = kwargs.get('env', None)
         volumes  = kwargs.get('volumes', None)
 
+        print('+ Create container %s with <image:%s> <command:%s>' %
+              (name, image, command))
         try:
             self.dk_client.containers.get(name).remove(force=True)
             print('==> remove existed container %s' % name)
@@ -52,6 +81,25 @@ class DeployOpenstack(DeployOpenstackBase, Const):
         super(DeployOpenstack, self).__init__()
 
         self.hdr_keystone = None
+
+    def init_network(self):
+        ## docker network
+        stk_mgmt = {
+            'name'      : 'stk_mgmt',
+            'driver'    : 'bridge',
+            'subnet'    : '10.1.0.0/24',
+            'gateway'   : '10.1.0.254',
+        }
+
+        stk_prv = {
+            'name'      : 'stk_prv',
+            'driver'    : 'bridge',
+            'subnet'    : '203.1.113.0/24',
+            'gateway'   : '203.1.113.254',
+        }
+
+        self.create_network(**stk_mgmt)
+        self.create_network(**stk_prv)
 
     def keystone_container(self):
         env_pythonpath = 'PYTHONPATH=$PYTHONPATH:/opt/keystone/'\
@@ -96,4 +144,4 @@ class DeployOpenstack(DeployOpenstackBase, Const):
 
 
 if __name__ == '__main__':
-    DeployOpenstack().keystone_config()
+    DeployOpenstack().init_network()
