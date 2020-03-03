@@ -34,6 +34,17 @@ class DeployOpenstackBase(object):
             image, command, cap_add=cap_add, detach=True, environment=env,
             hostname=hostname, name=name, volumes=volumes)
 
+    def exec_run(self, container, command, workdir=None):
+        exit, output = container.exec_run(command, workdir=workdir)
+        print('..run <%s> in container %s with exit code %d' %
+              (command, container.name, exit))
+        if exit is 0:
+            print('<DEBUG>: output is\n%s' % output)
+        else:
+            print('<FAILED>: output is\n%s' % output)
+
+        return exit
+
 
 class DeployOpenstack(DeployOpenstackBase, Const):
     def __init__(self):
@@ -75,6 +86,14 @@ class DeployOpenstack(DeployOpenstackBase, Const):
         print('... Successfully create container keystone with <id:%s>' %
               self.hdr_keystone.id)
 
+    def keystone_config(self):
+        hdr_keystone = self.hdr_keystone or\
+                       self.dk_client.containers.get('keystone')
+        print('<DEBUG> hdr_keystone is %s' % hdr_keystone)
+
+        self.exec_run(hdr_keystone, 'python setup.py install',
+                      workdir='/data/openstack/keystone')
+
 
 if __name__ == '__main__':
-    DeployOpenstack().keystone_container()
+    DeployOpenstack().keystone_config()
