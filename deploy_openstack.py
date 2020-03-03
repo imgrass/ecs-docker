@@ -6,6 +6,27 @@ class Const(object):
     dir_workspace = '/home/eouylei/imgrass/project/ecs-docker/workspace'
     dir_src = '/home/eouylei/imgrass/source-code/ecs-mos'
 
+    ## network
+    # bridge: stk_mgmt
+    ntw_mgmt = {
+        'name'      : 'stk_mgmt',
+        'subnet'    : '10.1.0.0/24',
+        'gateway'   : '10.1.0.254',
+        'container' : {
+            'keystone'  : '10.1.0.63',
+        },
+    }
+
+    # bridge: stk_prv
+    ntw_prv = {
+        'name'      : 'stk_prv',
+        'subnet'    : '203.1.113.0/24',
+        'gateway'   : '203.1.113.254',
+        'container' : {
+            'keystone'  : '203.1.113.30',
+        },
+    }
+
 
 class DeployOpenstackBase(object):
     '''
@@ -84,22 +105,8 @@ class DeployOpenstack(DeployOpenstackBase, Const):
 
     def init_network(self):
         ## docker network
-        stk_mgmt = {
-            'name'      : 'stk_mgmt',
-            'driver'    : 'bridge',
-            'subnet'    : '10.1.0.0/24',
-            'gateway'   : '10.1.0.254',
-        }
-
-        stk_prv = {
-            'name'      : 'stk_prv',
-            'driver'    : 'bridge',
-            'subnet'    : '203.1.113.0/24',
-            'gateway'   : '203.1.113.254',
-        }
-
-        self.create_network(**stk_mgmt)
-        self.create_network(**stk_prv)
+        self.create_network(**self.ntw_mgmt)
+        self.create_network(**self.ntw_prv)
 
     def keystone_container(self):
         env_pythonpath = 'PYTHONPATH=$PYTHONPATH:/opt/keystone/'\
@@ -142,6 +149,23 @@ class DeployOpenstack(DeployOpenstackBase, Const):
         self.exec_run(hdr_keystone, 'python setup.py install',
                       workdir='/data/openstack/keystone')
 
+        ## config network of keystone
+        def connect_network(name, ipv4_addr):
+            print('+ Connect network %s to keystone with ipv4 addr %s' %
+                  (name, ipv4_addr))
+            hdr_ntw = self.dk_client.networks.get(name)
+            for hdr_container in hdr_ntw.containers:
+                if hdr_container == hdr_keystone:
+                    print('  Network already connect with keystone')
+                    return
+            hdr_ntw.connect(hdr_keystone, ipv4_address=ipv4_addr)
+
+        connect_network(self.ntw_mgmt['name'],
+                        self.ntw_mgmt['container']['keystone'])
+        connect_network(self.ntw_prv['name'],
+                        self.ntw_prv['container']['keystone'])
+
 
 if __name__ == '__main__':
     DeployOpenstack().init_network()
+    DeployOpenstack().keystone_config()
